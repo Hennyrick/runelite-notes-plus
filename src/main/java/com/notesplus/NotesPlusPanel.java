@@ -18,7 +18,12 @@ import javax.swing.tree.TreePath;
 import net.runelite.client.ui.PluginPanel;
 
 class NotesPlusPanel extends PluginPanel
+{
+	private static final String FOLDER_EMPTY_STATE = "Select a note to view and edit its content.";
 
+	private final NotesTreeManager treeManager;
+	private final JTree notesTree;
+	private final JTextArea editor = new JTextArea();
 	private boolean editorSyncInProgress;
 
 	NotesPlusPanel(NotesTreeManager treeManager)
@@ -38,24 +43,30 @@ class NotesPlusPanel extends PluginPanel
 	private JPanel buildTopControls()
 	{
 		JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+		controlPanel.add(new JButton(new AbstractAction("New Folder")
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
 			{
 				DefaultMutableTreeNode created = treeManager.createFolder(getSelectedNode());
+				expandParentOf(created);
 				selectNode(created);
 			}
 		}));
 
+		controlPanel.add(new JButton(new AbstractAction("New Note")
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
 			{
 				DefaultMutableTreeNode created = treeManager.createNote(getSelectedNode());
+				expandParentOf(created);
 				selectNode(created);
+				editor.requestFocusInWindow();
 			}
 		}));
 
+		controlPanel.add(new JButton(new AbstractAction("Rename")
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -64,6 +75,7 @@ class NotesPlusPanel extends PluginPanel
 			}
 		}));
 
+		controlPanel.add(new JButton(new AbstractAction("Delete")
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -77,6 +89,8 @@ class NotesPlusPanel extends PluginPanel
 	private JSplitPane buildEditorArea()
 	{
 		notesTree.setRootVisible(true);
+		editor.setLineWrap(true);
+		editor.setWrapStyleWord(true);
 
 		JSplitPane splitPane = new JSplitPane(
 			JSplitPane.HORIZONTAL_SPLIT,
@@ -127,7 +141,7 @@ class NotesPlusPanel extends PluginPanel
 			return;
 		}
 
-		setEditorState("", false);
+		setEditorState(FOLDER_EMPTY_STATE, false);
 	}
 
 	private void syncEditorToSelectedNote()
@@ -137,6 +151,12 @@ class NotesPlusPanel extends PluginPanel
 			return;
 		}
 
+		DefaultMutableTreeNode selectedNode = getSelectedNode();
+		NotesNodeData data = NotesTreeManager.getData(selectedNode);
+		if (data != null && data.isNote())
+		{
+			treeManager.updateNoteContent(selectedNode, editor.getText());
+		}
 	}
 
 	private void handleRename()
@@ -149,22 +169,80 @@ class NotesPlusPanel extends PluginPanel
 		}
 
 		String updatedName = JOptionPane.showInputDialog(this, "Enter new name", data.getName());
-		if (updatedName != null)
+		if (updatedName == null)
 		{
-			treeManager.rename(selectedNode, updatedName);
+			return;
+		}
+
+		NotesTreeManager.RenameResult result = treeManager.rename(selectedNode, updatedName);
+		if (result == NotesTreeManager.RenameResult.INVALID_NAME)
+		{
+			showMessage("Name cannot be empty.");
+		}
+		else if (result == NotesTreeManager.RenameResult.DUPLICATE_NAME)
+		{
+			showMessage(data.isFolder()
+				? "A folder with that name already exists in this location."
+				: "A note with that name already exists in this location.");
 		}
 	}
 
 	private void handleDelete()
 	{
 		DefaultMutableTreeNode selectedNode = getSelectedNode();
-		DefaultMutableTreeNode parent = (DefaultMutableTreeNode) selectedNode.getParent();
-		if (!treeManager.delete(selectedNode))
+		NotesNodeData data = NotesTreeManager.getData(selectedNode);
+		if (data == null)
 		{
 			return;
 		}
 
-		selectNode(parent == null ? treeManager.getRoot() : parent);
+		if (data.isFolder() && treeManager.hasChildren(selectedNode))
+		{
+			int confirmation = JOptionPane.showConfirmDialog(
+				this,
+				"This folder contains notes/folders. Delete it and all children?",
+				"Confirm delete",
+				JOptionPane.YES_NO_OPTION,
+				JOptionPane.WARNING_MESSAGE
+			);
+			if (confirmation != JOptionPane.YES_OPTION)
+			{
+				return;
+			}
+		}
+
+		DefaultMutableTreeNode fallbackNode = determineDeleteFallback(selectedNode);
+		if (!treeManager.delete(selectedNode))
+		{
+			showMessage("That item cannot be deleted.");
+			return;
+		}
+
+		if (fallbackNode == null)
+		{
+			fallbackNode = treeManager.getRoot();
+		}
+		selectNode(fallbackNode);
+	}
+
+	private DefaultMutableTreeNode determineDeleteFallback(DefaultMutableTreeNode deletingNode)
+	{
+		DefaultMutableTreeNode parent = (DefaultMutableTreeNode) deletingNode.getParent();
+		if (parent == null)
+		{
+			return treeManager.getRoot();
+		}
+
+		int index = parent.getIndex(deletingNode);
+		if (index >= 0 && index + 1 < parent.getChildCount())
+		{
+			return (DefaultMutableTreeNode) parent.getChildAt(index + 1);
+		}
+		if (index > 0 && index - 1 < parent.getChildCount())
+		{
+			return (DefaultMutableTreeNode) parent.getChildAt(index - 1);
+		}
+		return parent;
 	}
 
 	private DefaultMutableTreeNode getSelectedNode()
@@ -185,7 +263,8 @@ class NotesPlusPanel extends PluginPanel
 		try
 		{
 			editor.setEnabled(enabled);
-			editor.setText(text);
+			editor.setText(text == null ? "" : text);
+			editor.setCaretPosition(0);
 		}
 		finally
 		{
@@ -204,5 +283,19 @@ class NotesPlusPanel extends PluginPanel
 		TreePath path = new TreePath(node.getPath());
 		notesTree.setSelectionPath(path);
 		notesTree.scrollPathToVisible(path);
+	}
+
+	private void expandParentOf(DefaultMutableTreeNode node)
+	{
+		DefaultMutableTreeNode parent = (DefaultMutableTreeNode) node.getParent();
+		if (parent != null)
+		{
+			notesTree.expandPath(new TreePath(parent.getPath()));
+		}
+	}
+
+	private void showMessage(String message)
+	{
+		JOptionPane.showMessageDialog(this, message, "Notes Plus", JOptionPane.INFORMATION_MESSAGE);
 	}
 }
