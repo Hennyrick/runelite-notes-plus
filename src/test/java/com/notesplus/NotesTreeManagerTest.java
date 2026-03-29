@@ -99,4 +99,66 @@ public class NotesTreeManagerTest
 		NotesTreeSnapshot.Node savedNote = snapshot.getRoot().getChildren().get(0);
 		assertEquals("Farm runs every 90 mins", savedNote.getContent());
 	}
+
+	@Test
+	public void moveNoteIntoFolder()
+	{
+		DefaultMutableTreeNode sourceFolder = treeManager.createFolder(treeManager.getRoot());
+		DefaultMutableTreeNode destinationFolder = treeManager.createFolder(treeManager.getRoot());
+		DefaultMutableTreeNode note = treeManager.createNote(sourceFolder);
+
+		assertEquals(NotesTreeManager.MoveResult.SUCCESS, treeManager.moveNode(note, destinationFolder, 0));
+		assertEquals(destinationFolder, note.getParent());
+		assertEquals(1, destinationFolder.getChildCount());
+	}
+
+	@Test
+	public void moveFolderIntoFolder()
+	{
+		DefaultMutableTreeNode sourceFolder = treeManager.createFolder(treeManager.getRoot());
+		DefaultMutableTreeNode destinationFolder = treeManager.createFolder(treeManager.getRoot());
+
+		assertEquals(NotesTreeManager.MoveResult.SUCCESS, treeManager.moveNode(sourceFolder, destinationFolder, 0));
+		assertEquals(destinationFolder, sourceFolder.getParent());
+	}
+
+	@Test
+	public void rejectDropIntoNote()
+	{
+		DefaultMutableTreeNode folder = treeManager.createFolder(treeManager.getRoot());
+		DefaultMutableTreeNode note = treeManager.createNote(treeManager.getRoot());
+
+		assertEquals(NotesTreeManager.MoveResult.TARGET_IS_NOTE, treeManager.moveNode(folder, note, 0));
+		assertEquals(treeManager.getRoot(), folder.getParent());
+	}
+
+	@Test
+	public void rejectMovingRoot()
+	{
+		DefaultMutableTreeNode folder = treeManager.createFolder(treeManager.getRoot());
+
+		assertEquals(NotesTreeManager.MoveResult.SOURCE_IS_ROOT, treeManager.moveNode(treeManager.getRoot(), folder, 0));
+	}
+
+	@Test
+	public void rejectMovingFolderIntoOwnDescendant()
+	{
+		DefaultMutableTreeNode folder = treeManager.createFolder(treeManager.getRoot());
+		DefaultMutableTreeNode childFolder = treeManager.createFolder(folder);
+
+		assertEquals(NotesTreeManager.MoveResult.CYCLE_DETECTED, treeManager.moveNode(folder, childFolder, 0));
+		assertEquals(treeManager.getRoot(), folder.getParent());
+	}
+
+	@Test
+	public void reorderAmongSiblings()
+	{
+		DefaultMutableTreeNode parent = treeManager.getRoot();
+		DefaultMutableTreeNode first = treeManager.createFolder(parent);
+		DefaultMutableTreeNode second = treeManager.createFolder(parent);
+
+		assertEquals(NotesTreeManager.MoveResult.SUCCESS, treeManager.moveNode(second, parent, 0));
+		assertEquals(second, parent.getChildAt(0));
+		assertEquals(first, parent.getChildAt(1));
+	}
 }

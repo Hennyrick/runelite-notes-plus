@@ -19,6 +19,16 @@ class NotesTreeManager
 		INVALID_NODE
 	}
 
+	enum MoveResult
+	{
+		SUCCESS,
+		INVALID_SOURCE,
+		INVALID_TARGET,
+		SOURCE_IS_ROOT,
+		TARGET_IS_NOTE,
+		CYCLE_DETECTED
+	}
+
 	private final DefaultMutableTreeNode root;
 	private final DefaultTreeModel treeModel;
 	private final AtomicInteger folderSequence = new AtomicInteger(1);
@@ -150,6 +160,68 @@ class NotesTreeManager
 		return node != null && node.getChildCount() > 0;
 	}
 
+	MoveResult validateMove(DefaultMutableTreeNode sourceNode, DefaultMutableTreeNode targetParent)
+	{
+		if (sourceNode == null)
+		{
+			return MoveResult.INVALID_SOURCE;
+		}
+		if (targetParent == null)
+		{
+			return MoveResult.INVALID_TARGET;
+		}
+		if (sourceNode == root)
+		{
+			return MoveResult.SOURCE_IS_ROOT;
+		}
+
+		NotesNodeData targetData = getData(targetParent);
+		if (targetData == null)
+		{
+			return MoveResult.INVALID_TARGET;
+		}
+		if (targetData.isNote())
+		{
+			return MoveResult.TARGET_IS_NOTE;
+		}
+		if (isSameNodeOrDescendant(sourceNode, targetParent))
+		{
+			return MoveResult.CYCLE_DETECTED;
+		}
+		return MoveResult.SUCCESS;
+	}
+
+	MoveResult moveNode(DefaultMutableTreeNode sourceNode, DefaultMutableTreeNode targetParent, int targetIndex)
+	{
+		MoveResult validation = validateMove(sourceNode, targetParent);
+		if (validation != MoveResult.SUCCESS)
+		{
+			return validation;
+		}
+
+		DefaultMutableTreeNode currentParent = (DefaultMutableTreeNode) sourceNode.getParent();
+		if (currentParent == null)
+		{
+			return MoveResult.INVALID_SOURCE;
+		}
+
+		int oldIndex = currentParent.getIndex(sourceNode);
+		int boundedIndex = Math.max(0, Math.min(targetIndex, targetParent.getChildCount()));
+		if (currentParent == targetParent && boundedIndex > oldIndex)
+		{
+			boundedIndex--;
+		}
+		if (currentParent == targetParent && boundedIndex == oldIndex)
+		{
+			return MoveResult.SUCCESS;
+		}
+
+		treeModel.removeNodeFromParent(sourceNode);
+		treeModel.insertNodeInto(sourceNode, targetParent, boundedIndex);
+		notifyChanged();
+		return MoveResult.SUCCESS;
+	}
+
 	NotesTreeSnapshot toSnapshot()
 	{
 		return new NotesTreeSnapshot(toSnapshotNode(root));
@@ -274,6 +346,20 @@ class NotesTreeManager
 		{
 			return 0;
 		}
+	}
+
+	private boolean isSameNodeOrDescendant(DefaultMutableTreeNode ancestor, DefaultMutableTreeNode node)
+	{
+		DefaultMutableTreeNode cursor = node;
+		while (cursor != null)
+		{
+			if (cursor == ancestor)
+			{
+				return true;
+			}
+			cursor = (DefaultMutableTreeNode) cursor.getParent();
+		}
+		return false;
 	}
 
 	private DefaultMutableTreeNode fromSnapshot(NotesTreeSnapshot.Node snapshotNode)
