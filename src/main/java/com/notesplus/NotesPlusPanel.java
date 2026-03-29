@@ -23,13 +23,21 @@ class NotesPlusPanel extends PluginPanel
 
 	private final NotesTreeManager treeManager;
 	private final JTree notesTree;
+	private final NotesTreeDragDropController dragDropController;
 	private final JTextArea editor = new JTextArea();
 	private boolean editorSyncInProgress;
+	private boolean filterActive;
 
 	NotesPlusPanel(NotesTreeManager treeManager)
 	{
 		this.treeManager = treeManager;
 		this.notesTree = new JTree(treeManager.getTreeModel());
+		this.dragDropController = new NotesTreeDragDropController(
+			notesTree,
+			treeManager,
+			this::isFilterActive,
+			this::selectNode,
+			this::showMessage);
 
 		setLayout(new BorderLayout());
 		add(buildTopControls(), BorderLayout.NORTH);
@@ -89,6 +97,7 @@ class NotesPlusPanel extends PluginPanel
 	private JSplitPane buildEditorArea()
 	{
 		notesTree.setRootVisible(true);
+		dragDropController.install();
 		editor.setLineWrap(true);
 		editor.setWrapStyleWord(true);
 
@@ -297,5 +306,10 @@ class NotesPlusPanel extends PluginPanel
 	private void showMessage(String message)
 	{
 		JOptionPane.showMessageDialog(this, message, "Notes Plus", JOptionPane.INFORMATION_MESSAGE);
+	}
+
+	private boolean isFilterActive()
+	{
+		return filterActive;
 	}
 }
