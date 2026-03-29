@@ -2,6 +2,7 @@ package com.notesplus;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import javax.swing.AbstractAction;
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -17,17 +18,15 @@ import javax.swing.tree.TreePath;
 import net.runelite.client.ui.PluginPanel;
 
 class NotesPlusPanel extends PluginPanel
-{
-	private final NotesTreeManager treeManager = new NotesTreeManager();
-	private final JTree notesTree = new JTree(treeManager.getTreeModel());
-	private final JTextArea editor = new JTextArea();
 
 	private boolean editorSyncInProgress;
 
-	NotesPlusPanel()
+	NotesPlusPanel(NotesTreeManager treeManager)
 	{
-		setLayout(new BorderLayout());
+		this.treeManager = treeManager;
+		this.notesTree = new JTree(treeManager.getTreeModel());
 
+		setLayout(new BorderLayout());
 		add(buildTopControls(), BorderLayout.NORTH);
 		add(buildEditorArea(), BorderLayout.CENTER);
 
@@ -39,7 +38,6 @@ class NotesPlusPanel extends PluginPanel
 	private JPanel buildTopControls()
 	{
 		JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-		controlPanel.add(new JButton(new javax.swing.AbstractAction("New Folder")
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -48,7 +46,7 @@ class NotesPlusPanel extends PluginPanel
 				selectNode(created);
 			}
 		}));
-		controlPanel.add(new JButton(new javax.swing.AbstractAction("New Note")
+
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -57,7 +55,7 @@ class NotesPlusPanel extends PluginPanel
 				selectNode(created);
 			}
 		}));
-		controlPanel.add(new JButton(new javax.swing.AbstractAction("Rename")
+
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -65,7 +63,7 @@ class NotesPlusPanel extends PluginPanel
 				handleRename();
 			}
 		}));
-		controlPanel.add(new JButton(new javax.swing.AbstractAction("Delete")
+
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -139,11 +137,6 @@ class NotesPlusPanel extends PluginPanel
 			return;
 		}
 
-		NotesNodeData selectedData = NotesTreeManager.getData(getSelectedNode());
-		if (selectedData != null && selectedData.isNote())
-		{
-			selectedData.setContent(editor.getText());
-		}
 	}
 
 	private void handleRename()

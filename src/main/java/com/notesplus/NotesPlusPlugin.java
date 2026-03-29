@@ -24,14 +24,21 @@ public class NotesPlusPlugin extends Plugin
 	@Inject
 	private ClientToolbar clientToolbar;
 
-
 	private NotesPlusPanel panel;
 	private NavigationButton navigationButton;
+	private NotesTreeRepository repository;
+	private NotesTreeManager treeManager;
+	private NotesAutosaveController autosaveController;
 
 	@Override
 	protected void startUp()
 	{
-		panel = new NotesPlusPanel();
+		repository = new NotesTreeRepository();
+		treeManager = new NotesTreeManager(repository.load());
+		autosaveController = new NotesAutosaveController(() -> repository.save(treeManager.toSnapshot()));
+		treeManager.setChangeListener(autosaveController::requestSave);
+
+		panel = new NotesPlusPanel(treeManager);
 		BufferedImage icon = createPlaceholderIcon();
 		navigationButton = NavigationButton.builder()
 			.tooltip("Notes Plus")
@@ -52,7 +59,15 @@ public class NotesPlusPlugin extends Plugin
 			navigationButton = null;
 		}
 
+		if (autosaveController != null)
+		{
+			autosaveController.flushAndShutdown();
+			autosaveController = null;
+		}
+
 		panel = null;
+		treeManager = null;
+		repository = null;
 		log.debug("Notes Plus stopped");
 	}
 

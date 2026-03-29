@@ -1,21 +1,12 @@
 package com.notesplus;
 
+
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 
 class NotesTreeManager
 {
-	private static final String ROOT_FOLDER_NAME = "My Notes";
 
-	private final DefaultMutableTreeNode root;
-	private final DefaultTreeModel treeModel;
-	private int folderSequence = 1;
-	private int noteSequence = 1;
-
-	NotesTreeManager()
-	{
-		root = createFolderNode(ROOT_FOLDER_NAME);
-		treeModel = new DefaultTreeModel(root);
 	}
 
 	DefaultTreeModel getTreeModel()
@@ -28,11 +19,13 @@ class NotesTreeManager
 		return root;
 	}
 
+
 	DefaultMutableTreeNode createFolder(DefaultMutableTreeNode selectedNode)
 	{
 		DefaultMutableTreeNode parent = resolveTargetFolder(selectedNode);
 		DefaultMutableTreeNode folder = createFolderNode("New Folder " + folderSequence++);
 		treeModel.insertNodeInto(folder, parent, parent.getChildCount());
+
 		return folder;
 	}
 
@@ -41,6 +34,7 @@ class NotesTreeManager
 		DefaultMutableTreeNode parent = resolveTargetFolder(selectedNode);
 		DefaultMutableTreeNode note = createNoteNode("New Note " + noteSequence++);
 		treeModel.insertNodeInto(note, parent, parent.getChildCount());
+
 		return note;
 	}
 
@@ -65,6 +59,7 @@ class NotesTreeManager
 
 		data.setName(trimmed);
 		treeModel.nodeChanged(node);
+
 		return true;
 	}
 
@@ -76,6 +71,7 @@ class NotesTreeManager
 		}
 
 		treeModel.removeNodeFromParent(node);
+
 		return true;
 	}
 
@@ -111,6 +107,7 @@ class NotesTreeManager
 		Object userObject = node.getUserObject();
 		return userObject instanceof NotesNodeData ? (NotesNodeData) userObject : null;
 	}
+
 
 	private DefaultMutableTreeNode createFolderNode(String name)
 	{
