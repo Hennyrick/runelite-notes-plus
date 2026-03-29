@@ -18,10 +18,6 @@ import javax.swing.tree.TreePath;
 import net.runelite.client.ui.PluginPanel;
 
 class NotesPlusPanel extends PluginPanel
-{
-	private final NotesTreeManager treeManager;
-	private final JTree notesTree;
-	private final JTextArea editor = new JTextArea();
 
 	private boolean editorSyncInProgress;
 
@@ -42,7 +38,6 @@ class NotesPlusPanel extends PluginPanel
 	private JPanel buildTopControls()
 	{
 		JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-		controlPanel.add(new JButton(new AbstractAction("New Folder")
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -51,7 +46,7 @@ class NotesPlusPanel extends PluginPanel
 				selectNode(created);
 			}
 		}));
-		controlPanel.add(new JButton(new AbstractAction("New Note")
+
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -60,7 +55,7 @@ class NotesPlusPanel extends PluginPanel
 				selectNode(created);
 			}
 		}));
-		controlPanel.add(new JButton(new AbstractAction("Rename")
+
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -68,7 +63,7 @@ class NotesPlusPanel extends PluginPanel
 				handleRename();
 			}
 		}));
-		controlPanel.add(new JButton(new AbstractAction("Delete")
+
 		{
 			@Override
 			public void actionPerformed(java.awt.event.ActionEvent e)
@@ -82,6 +77,7 @@ class NotesPlusPanel extends PluginPanel
 	private JSplitPane buildEditorArea()
 	{
 		notesTree.setRootVisible(true);
+
 		JSplitPane splitPane = new JSplitPane(
 			JSplitPane.HORIZONTAL_SPLIT,
 			new JScrollPane(notesTree),
@@ -124,11 +120,13 @@ class NotesPlusPanel extends PluginPanel
 	{
 		DefaultMutableTreeNode selectedNode = getSelectedNode();
 		NotesNodeData data = NotesTreeManager.getData(selectedNode);
+
 		if (data != null && data.isNote())
 		{
 			setEditorState(data.getContent(), true);
 			return;
 		}
+
 		setEditorState("", false);
 	}
 
@@ -138,7 +136,7 @@ class NotesPlusPanel extends PluginPanel
 		{
 			return;
 		}
-		treeManager.updateNoteContent(getSelectedNode(), editor.getText());
+
 	}
 
 	private void handleRename()
@@ -165,6 +163,7 @@ class NotesPlusPanel extends PluginPanel
 		{
 			return;
 		}
+
 		selectNode(parent == null ? treeManager.getRoot() : parent);
 	}
 
