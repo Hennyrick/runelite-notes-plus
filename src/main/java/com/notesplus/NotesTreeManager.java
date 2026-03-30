@@ -222,6 +222,28 @@ class NotesTreeManager
 		return MoveResult.SUCCESS;
 	}
 
+
+	boolean replaceTree(NotesTreeSnapshot snapshot)
+	{
+		NotesTreeSnapshot.Node snapshotRoot = snapshot != null ? snapshot.getRoot() : null;
+		if (snapshotRoot == null || snapshotRoot.getType() != NotesNodeData.Type.FOLDER)
+		{
+			return false;
+		}
+
+		DefaultMutableTreeNode rebuiltRoot = fromSnapshot(snapshotRoot);
+		root.setUserObject(rebuiltRoot.getUserObject());
+		root.removeAllChildren();
+		while (rebuiltRoot.getChildCount() > 0)
+		{
+			root.add((DefaultMutableTreeNode) rebuiltRoot.getChildAt(0));
+		}
+		treeModel.reload();
+		recalculateSequences();
+		notifyChanged();
+		return true;
+	}
+
 	NotesTreeSnapshot toSnapshot()
 	{
 		return new NotesTreeSnapshot(toSnapshotNode(root));

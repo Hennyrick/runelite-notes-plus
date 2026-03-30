@@ -2,8 +2,11 @@ package com.notesplus;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.event.ActionEvent;
+import java.nio.file.Path;
 import javax.swing.AbstractAction;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -15,6 +18,7 @@ import javax.swing.event.DocumentListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreePath;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import net.runelite.client.ui.PluginPanel;
 
 class NotesPlusPanel extends PluginPanel
@@ -22,15 +26,17 @@ class NotesPlusPanel extends PluginPanel
 	private static final String FOLDER_EMPTY_STATE = "Select a note to view and edit its content.";
 
 	private final NotesTreeManager treeManager;
+	private final NotesTreeRepository repository;
 	private final JTree notesTree;
 	private final NotesTreeDragDropController dragDropController;
 	private final JTextArea editor = new JTextArea();
 	private boolean editorSyncInProgress;
 	private boolean filterActive;
 
-	NotesPlusPanel(NotesTreeManager treeManager)
+	NotesPlusPanel(NotesTreeManager treeManager, NotesTreeRepository repository)
 	{
 		this.treeManager = treeManager;
+		this.repository = repository;
 		this.notesTree = new JTree(treeManager.getTreeModel());
 		this.dragDropController = new NotesTreeDragDropController(
 			notesTree,
@@ -54,7 +60,7 @@ class NotesPlusPanel extends PluginPanel
 		controlPanel.add(new JButton(new AbstractAction("New Folder")
 		{
 			@Override
-			public void actionPerformed(java.awt.event.ActionEvent e)
+			public void actionPerformed(ActionEvent e)
 			{
 				DefaultMutableTreeNode created = treeManager.createFolder(getSelectedNode());
 				expandParentOf(created);
@@ -65,7 +71,7 @@ class NotesPlusPanel extends PluginPanel
 		controlPanel.add(new JButton(new AbstractAction("New Note")
 		{
 			@Override
-			public void actionPerformed(java.awt.event.ActionEvent e)
+			public void actionPerformed(ActionEvent e)
 			{
 				DefaultMutableTreeNode created = treeManager.createNote(getSelectedNode());
 				expandParentOf(created);
@@ -77,7 +83,7 @@ class NotesPlusPanel extends PluginPanel
 		controlPanel.add(new JButton(new AbstractAction("Rename")
 		{
 			@Override
-			public void actionPerformed(java.awt.event.ActionEvent e)
+			public void actionPerformed(ActionEvent e)
 			{
 				handleRename();
 			}
@@ -86,9 +92,27 @@ class NotesPlusPanel extends PluginPanel
 		controlPanel.add(new JButton(new AbstractAction("Delete")
 		{
 			@Override
-			public void actionPerformed(java.awt.event.ActionEvent e)
+			public void actionPerformed(ActionEvent e)
 			{
 				handleDelete();
+			}
+		}));
+
+		controlPanel.add(new JButton(new AbstractAction("Import")
+		{
+			@Override
+			public void actionPerformed(ActionEvent e)
+			{
+				handleImport();
+			}
+		}));
+
+		controlPanel.add(new JButton(new AbstractAction("Export")
+		{
+			@Override
+			public void actionPerformed(ActionEvent e)
+			{
+				handleExport();
 			}
 		}));
 		return controlPanel;
@@ -234,6 +258,77 @@ class NotesPlusPanel extends PluginPanel
 		selectNode(fallbackNode);
 	}
 
+	private void handleImport()
+	{
+		int confirmation = JOptionPane.showConfirmDialog(
+			this,
+			"Importing will replace all current notes. Continue?",
+			"Confirm import",
+			JOptionPane.YES_NO_OPTION,
+			JOptionPane.WARNING_MESSAGE
+		);
+		if (confirmation != JOptionPane.YES_OPTION)
+		{
+			return;
+		}
+
+		JFileChooser chooser = createJsonChooser("Import Notes Tree");
+		if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION)
+		{
+			return;
+		}
+
+		Path path = chooser.getSelectedFile().toPath();
+		NotesTreeRepository.LoadResult result = repository.importFrom(path);
+		if (!result.isSuccess())
+		{
+			showMessage("Import failed: " + result.getError());
+			return;
+		}
+
+		if (!treeManager.replaceTree(result.getSnapshot()))
+		{
+			showMessage("Import failed: root folder is invalid.");
+			return;
+		}
+
+		selectRoot();
+		showMessage("Import successful.");
+	}
+
+	private void handleExport()
+	{
+		JFileChooser chooser = new ConfirmOverwriteFileChooser();
+		chooser.setDialogTitle("Export Notes Tree");
+		chooser.setFileFilter(new FileNameExtensionFilter("JSON Files", "json"));
+		if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION)
+		{
+			return;
+		}
+
+		Path targetPath = chooser.getSelectedFile().toPath();
+		if (!targetPath.getFileName().toString().toLowerCase().endsWith(".json"))
+		{
+			targetPath = targetPath.resolveSibling(targetPath.getFileName().toString() + ".json");
+		}
+
+		String error = repository.exportTo(treeManager.toSnapshot(), targetPath);
+		if (error != null)
+		{
+			showMessage("Export failed: " + error);
+			return;
+		}
+		showMessage("Exported notes to " + targetPath);
+	}
+
+	private JFileChooser createJsonChooser(String title)
+	{
+		JFileChooser chooser = new JFileChooser();
+		chooser.setDialogTitle(title);
+		chooser.setFileFilter(new FileNameExtensionFilter("JSON Files", "json"));
+		return chooser;
+	}
+
 	private DefaultMutableTreeNode determineDeleteFallback(DefaultMutableTreeNode deletingNode)
 	{
 		DefaultMutableTreeNode parent = (DefaultMutableTreeNode) deletingNode.getParent();
@@ -311,5 +406,28 @@ class NotesPlusPanel extends PluginPanel
 	private boolean isFilterActive()
 	{
 		return filterActive;
+	}
+
+	private static class ConfirmOverwriteFileChooser extends JFileChooser
+	{
+		@Override
+		public void approveSelection()
+		{
+			if (getDialogType() == SAVE_DIALOG && getSelectedFile() != null && getSelectedFile().exists())
+			{
+				int choice = JOptionPane.showConfirmDialog(
+					this,
+					"The selected file already exists. Overwrite it?",
+					"Confirm overwrite",
+					JOptionPane.YES_NO_OPTION,
+					JOptionPane.WARNING_MESSAGE
+				);
+				if (choice != JOptionPane.YES_OPTION)
+				{
+					return;
+				}
+			}
+			super.approveSelection();
+		}
 	}
 }

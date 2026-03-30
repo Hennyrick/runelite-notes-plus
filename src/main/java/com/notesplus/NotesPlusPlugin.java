@@ -38,7 +38,7 @@ public class NotesPlusPlugin extends Plugin
 		autosaveController = new NotesAutosaveController(() -> repository.save(treeManager.toSnapshot()));
 		treeManager.setChangeListener(autosaveController::requestSave);
 
-		panel = new NotesPlusPanel(treeManager);
+		panel = new NotesPlusPanel(treeManager, repository);
 		BufferedImage icon = createPlaceholderIcon();
 		navigationButton = NavigationButton.builder()
 			.tooltip("Notes Plus")
