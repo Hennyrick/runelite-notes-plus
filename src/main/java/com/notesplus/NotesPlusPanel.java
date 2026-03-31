@@ -26,7 +26,7 @@ class NotesPlusPanel extends PluginPanel
 	private static final String FOLDER_EMPTY_STATE = "Select a note to view and edit its content.";
 
 	private final NotesTreeManager treeManager;
-	private final NotesTreeRepository repository;
+	private final NotesTreeTransferService transferService;
 	private final JTree notesTree;
 	private final NotesTreeDragDropController dragDropController;
 	private final JTextArea editor = new JTextArea();
@@ -36,7 +36,7 @@ class NotesPlusPanel extends PluginPanel
 	NotesPlusPanel(NotesTreeManager treeManager, NotesTreeRepository repository)
 	{
 		this.treeManager = treeManager;
-		this.repository = repository;
+		this.transferService = new NotesTreeTransferService(repository);
 		this.notesTree = new JTree(treeManager.getTreeModel());
 		this.dragDropController = new NotesTreeDragDropController(
 			notesTree,
@@ -279,20 +279,20 @@ class NotesPlusPanel extends PluginPanel
 		}
 
 		Path path = chooser.getSelectedFile().toPath();
-		NotesTreeRepository.LoadResult result = repository.importFrom(path);
+		NotesTreeRepository.LoadResult result = transferService.importSnapshot(path);
 		if (!result.isSuccess())
 		{
-			showMessage("Import failed: " + result.getError());
+			showErrorMessage("Import failed: " + result.getError());
 			return;
 		}
 
 		if (!treeManager.replaceTree(result.getSnapshot()))
 		{
-			showMessage("Import failed: root folder is invalid.");
+			showErrorMessage("Import failed: root folder is invalid.");
 			return;
 		}
 
-		selectRoot();
+		selectAfterImport();
 		showMessage("Import successful.");
 	}
 
@@ -312,10 +312,10 @@ class NotesPlusPanel extends PluginPanel
 			targetPath = targetPath.resolveSibling(targetPath.getFileName().toString() + ".json");
 		}
 
-		String error = repository.exportTo(treeManager.toSnapshot(), targetPath);
+		String error = transferService.exportSnapshot(treeManager.toSnapshot(), targetPath);
 		if (error != null)
 		{
-			showMessage("Export failed: " + error);
+			showErrorMessage("Export failed: " + error);
 			return;
 		}
 		showMessage("Exported notes to " + targetPath);
@@ -382,6 +382,20 @@ class NotesPlusPanel extends PluginPanel
 		notesTree.expandRow(0);
 	}
 
+	private void selectAfterImport()
+	{
+		DefaultMutableTreeNode root = treeManager.getRoot();
+		if (root.getChildCount() > 0)
+		{
+			selectNode((DefaultMutableTreeNode) root.getChildAt(0));
+		}
+		else
+		{
+			selectNode(root);
+		}
+		notesTree.expandRow(0);
+	}
+
 	private void selectNode(DefaultMutableTreeNode node)
 	{
 		TreePath path = new TreePath(node.getPath());
@@ -401,6 +415,11 @@ class NotesPlusPanel extends PluginPanel
 	private void showMessage(String message)
 	{
 		JOptionPane.showMessageDialog(this, message, "Notes Plus", JOptionPane.INFORMATION_MESSAGE);
+	}
+
+	private void showErrorMessage(String message)
+	{
+		JOptionPane.showMessageDialog(this, message, "Notes Plus", JOptionPane.ERROR_MESSAGE);
 	}
 
 	private boolean isFilterActive()
