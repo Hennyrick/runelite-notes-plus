@@ -3,6 +3,7 @@ package com.notesplus;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -39,12 +40,27 @@ public class NotesTreeRepositoryTest
 		NotesTreeRepository repository = new NotesTreeRepository(dataFile);
 
 		NotesTreeSnapshot snapshot = buildSampleSnapshot();
-		assertEquals(null, repository.exportTo(snapshot, exportFile));
+		assertNull(repository.exportTo(snapshot, exportFile));
 
 		NotesTreeRepository.LoadResult imported = repository.importFrom(exportFile);
 
 		assertTrue(imported.isSuccess());
 		assertEquals(snapshot, imported.getSnapshot());
+	}
+
+	@Test
+	public void exportUsesPrettyPrintedJson() throws Exception
+	{
+		Path dataFile = temporaryFolder.newFile("tree.json").toPath();
+		Path exportFile = temporaryFolder.newFile("pretty-export.json").toPath();
+		NotesTreeRepository repository = new NotesTreeRepository(dataFile);
+
+		NotesTreeSnapshot snapshot = buildSampleSnapshot();
+		assertNull(repository.exportTo(snapshot, exportFile));
+
+		String exported = new String(Files.readAllBytes(exportFile), StandardCharsets.UTF_8);
+		assertTrue(exported.contains("\n"));
+		assertTrue(exported.contains("  \"root\""));
 	}
 
 	@Test
@@ -96,6 +112,19 @@ public class NotesTreeRepositoryTest
 
 		assertFalse(result.isSuccess());
 		assertEquals("Missing required field: root.", result.getError());
+	}
+
+	@Test
+	public void importRejectsNonFolderRoot() throws Exception
+	{
+		Path file = temporaryFolder.newFile("root-note.json").toPath();
+		Files.write(file, "{\"root\":{\"type\":\"NOTE\",\"name\":\"Root note\"}}".getBytes(StandardCharsets.UTF_8));
+		NotesTreeRepository repository = new NotesTreeRepository(file);
+
+		NotesTreeRepository.LoadResult result = repository.importFrom(file);
+
+		assertFalse(result.isSuccess());
+		assertEquals("The root node must be a folder.", result.getError());
 	}
 
 	private NotesTreeSnapshot buildSampleSnapshot()
